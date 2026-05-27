@@ -1,8 +1,10 @@
 node_modules
-<<<<<<< HEAD
+
 .env
 dist
 build
-=======
+
 .env
->>>>>>> 6532c81 (Initial commit - Library Management System (MERN))
+
+dist
+.env
