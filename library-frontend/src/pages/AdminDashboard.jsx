@@ -1,6 +1,16 @@
 import { useState, useEffect } from "react";
 
 import { useNavigate } from "react-router-dom";
+import {
+toast
+}
+from
+"react-toastify";
+import {
+getDashboard
+}
+from
+"../services/bookService";
 
 import {
   FaBook,
@@ -27,67 +37,83 @@ function AdminDashboard() {
   const [title, setTitle] = useState("");
 
   const [author, setAuthor] = useState("");
-
+  const [totalCopies, setTotalCopies] = useState("");
+const [quantity, setQuantity] = useState("");
   const [editingId, setEditingId] = useState(null);
-
+const [dashboard,setDashboard] = useState([]);
 
   // ================= FETCH BOOKS =================
 
-  useEffect(() => {
+useEffect(() => {
+  fetchBooks();
+  fetchDashboard();
 
+  const interval = setInterval(() => {
     fetchBooks();
+    fetchDashboard();
+  }, 10000);
 
-  }, []);
+  return () => clearInterval(interval);
+}, []);
 
 
 const fetchBooks = async () => {
-
   try {
-
     const res = await getBooks();
 
-    console.log(res.data);
+    console.log("BOOKS FROM SERVER:", res.data.books);
 
-    setBooks(res.data.books);
-
+    setBooks(res.data.books || []);
   } catch (error) {
-
     console.log(error);
-
   }
+};
+
+const fetchDashboard =
+async()=>{
+
+try{
+
+const res =
+await getDashboard();
+setDashboard(res.data?.dashboard || []);
+
+}catch(error){
+
+console.log(error);
+
+}
 
 };
 
-
   // ================= ADD BOOK =================
-
 const handleAddBook = async () => {
-
   try {
+    if (!title || !author || !quantity) {
+      toast.error("All fields are required");
+      return;
+    }
 
     const res = await addBook({
-      title,
-      author
+      title: title.trim(),
+      author: author.trim(),
+      totalCopies: Number(quantity)
     });
 
-    setBooks([
-      ...books,
-      res.data.book
-    ]);
+    fetchBooks();
 
     setTitle("");
     setAuthor("");
+    setQuantity("");
 
-  } catch(error){
-
+    toast.success("Book added successfully");
+  } catch (error) {
     console.log(error);
-
-    alert("Failed to add book");
-
+    toast.error(
+      error.response?.data?.message || "Failed to add book"
+    );
   }
-
 };
-
 
   // ================= DELETE =================
 
@@ -105,7 +131,7 @@ const handleDeleteBook = async (id) => {
 
     console.log(error);
 
-    alert("Delete failed");
+    toast.error("Failed to delete book");
 
   }
 
@@ -120,6 +146,7 @@ const handleDeleteBook = async (id) => {
 
     setAuthor(book.author);
 
+setQuantity(book.totalCopies);
     setEditingId(book._id);
 
   };
@@ -128,37 +155,27 @@ const handleDeleteBook = async (id) => {
   // ================= UPDATE =================
 
 const handleUpdateBook = async () => {
-
   try {
-
-    console.log("Updating:", editingId);
-
-    await updateBook(
-      editingId,
-      {
-        title,
-        author
-      }
-    );
-
+    await updateBook(editingId, {
+      title,
+      author,
+  totalCopies: Number(quantity)
+    });
     fetchBooks();
 
+    toast.success("Book updated successfully");
+
+
     setEditingId(null);
-
     setTitle("");
-
     setAuthor("");
+    setQuantity("");
 
-  } catch(error){
-
+  } catch (error) {
     console.log(error.response?.data);
-
-    alert("Update failed");
-
+    toast.error("Failed to update book");
   }
-
 };
-
 
   // ================= LOGOUT =================
 
@@ -166,7 +183,7 @@ const handleUpdateBook = async () => {
 
     localStorage.removeItem("admin");
 
-    alert("Logged Out Successfully");
+    toast.success("Logged Out Successfully");
 
     navigate("/");
 
@@ -256,6 +273,13 @@ const handleUpdateBook = async () => {
             className="p-4 rounded-xl border border-gray-300 outline-none focus:ring-2 focus:ring-blue-400"
           />
 
+<input
+  type="number"
+  placeholder="Enter total copies"
+  value={quantity}
+  onChange={(e)=>setQuantity(e.target.value)}
+  className="p-4 rounded-xl border border-gray-300 outline-none focus:ring-2 focus:ring-blue-400"
+/>
           {
 
             editingId ? (
@@ -321,7 +345,15 @@ const handleUpdateBook = async () => {
               <p className="text-slate-600 text-lg mb-6">
 
                 Author: {book.author}
+                <br/>
 
+<p className="text-slate-600">
+  Total Copies: {book.totalCopies}
+</p>
+
+<p className="text-green-700 font-semibold">
+  Available: {book.availableCopies}
+</p>
               </p>
 
               <div className="flex gap-4">
@@ -364,11 +396,63 @@ const handleUpdateBook = async () => {
 
         }
 
+</div>
+
+
+{/* DASHBOARD ANALYTICS */}
+
+<div className="mt-10">
+
+  <h2 className="text-3xl font-bold">
+
+    Borrow Analytics
+
+  </h2>
+
+  {
+
+    dashboard.map((item)=>(
+
+      <div
+        key={item.title}
+        className="border p-5 rounded-xl mt-4 bg-gray-50"
+      >
+
+        <h3 className="text-xl font-bold">
+
+          {item.title}
+
+        </h3>
+
+        <p className="mt-2">
+
+          Borrowed: {item.borrowCount}
+
+        </p>
+
+        <p className="mt-2">
+
+          Users:
+
+          {
+
+            item.borrowers.join(", ")
+
+          }
+
+        </p>
+
       </div>
 
-    </div>
+    ))
 
-  );
+  }
+
+</div>
+
+</div>
+
+);
 }
 
 export default AdminDashboard;

@@ -1,60 +1,60 @@
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
 
-const protect = async (req,res,next)=>{
-console.log(
-"AUTH HEADER:",
-req.headers.authorization
-);
-try{
+const protect = async (req, res, next) => {
+  try {
+    const authHeader = req.headers.authorization;
 
-console.log("AUTH HEADER:",req.headers.authorization);
+    console.log("AUTH HEADER:", authHeader);
 
-let token;
+    if (!authHeader || !authHeader.startsWith("Bearer")) {
+      return res.status(401).json({
+        message: "No token provided ❌"
+      });
+    }
 
-if(
-req.headers.authorization &&
-req.headers.authorization.startsWith("Bearer")
-){
+    const token = authHeader.split(" ")[1];
 
-token = req.headers.authorization.split(" ")[1];
+    console.log("TOKEN:", token);
 
-console.log("TOKEN:", token);
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-const decoded = jwt.verify(
-  token,
-  process.env.JWT_SECRET
-);
+    console.log("DECODED TOKEN:", decoded);
 
-console.log("DECODED TOKEN:", decoded);
+    const user = await User.findById(decoded.id).select("-password");
 
-const user = await User.findById(decoded.id)
-.select("-password");
+    if (!user) {
+      return res.status(404).json({
+        message: "User not found ❌"
+      });
+    }
 
-console.log("USER:",user);
+    console.log("USER:", user.email);
 
-req.user = user;
+    req.user = user;
 
-next();
+    next();
 
-}else{
+  } catch (error) {
+    console.log("AUTH ERROR:", error.message);
 
-return res.status(401).json({
-message:"No token provided"
-});
-
-}
-
-}catch(error){
-
-console.log("AUTH ERROR:",error);
-
-res.status(401).json({
-message:"Invalid token"
-});
-
-}
-
+    return res.status(401).json({
+      message: "Invalid or expired token ❌"
+    });
+  }
 };
+const authorizeRoles = (...roles) => {
+  return (req, res, next) => {
+    if (!roles.includes(req.user.role)) {
+      return res.status(403).json({
+        message: "Access denied ❌"
+      });
+    }
 
-module.exports = protect;
+    next();
+  };
+};
+module.exports = {
+  protect,
+  authorizeRoles
+};

@@ -1,17 +1,11 @@
 import { useState } from "react";
-
+import { toast } from "react-toastify";
 import { Link, useNavigate } from "react-router-dom";
 
-import {
-  FaUser,
-  FaEye,
-  FaEyeSlash
-} from "react-icons/fa";
-
+import { FaUser, FaEye, FaEyeSlash } from "react-icons/fa";
 import { loginUser } from "../services/authService";
 
 function Login() {
-
   const navigate = useNavigate();
 
   const [showPassword, setShowPassword] = useState(false);
@@ -28,59 +22,37 @@ function Login() {
     });
   };
 
-const handleSubmit = async (e) => {
+  const handleSubmit = async (e) => {
+    e.preventDefault();
 
-  e.preventDefault();
+    try {
+      console.log("Sending:", formData);
 
-  try {
+      const response = await loginUser(formData);
 
-    console.log("Sending:", formData);
+      console.log("RESPONSE:", response.data);
 
-    const response = await loginUser(formData);
+      // Save token + user
+      localStorage.setItem("token", response.data.token);
+      localStorage.setItem("user", JSON.stringify(response.data.user));
 
-    console.log("FULL RESPONSE:");
+      console.log("TOKEN SAVED:", localStorage.getItem("token"));
 
-    console.log(response);
+      // ✅ TOAST SUCCESS
+      toast.success("Login Successful");
 
-    console.log("RESPONSE DATA:");
+      // Redirect
+      navigate("/books");
 
-    console.log(response.data);
+    } catch (error) {
+      console.log("LOGIN ERROR:", error.response?.data);
 
-    localStorage.setItem(
-      "token",
-      response.data.token
-    );
-
-    localStorage.setItem(
-      "user",
-      JSON.stringify(response.data.user)
-    );
-
-    console.log(
-      "TOKEN SAVED:",
-      localStorage.getItem("token")
-    );
-
-    alert("Login Successful");
-
-    navigate("/home");
-
-  } catch(error){
-
-    console.log("LOGIN ERROR:");
-
-    console.log(error);
-
-    console.log(error.response?.data);
-
-    alert(
-      error.response?.data?.message ||
-      "Login Failed"
-    );
-
-  }
-
-};
+      // ❌ TOAST ERROR (instead of alert)
+      toast.error(
+        error.response?.data?.message || "Login Failed ❌"
+      );
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-150 via-slate-200 to-slate-200 flex justify-center items-center px-4">
@@ -88,111 +60,73 @@ const handleSubmit = async (e) => {
       <div className="bg-white/10 backdrop-blur-lg border border-white/20 p-10 rounded-3xl shadow-2xl w-full max-w-md">
 
         {/* Icon */}
-
         <div className="flex justify-center mb-5">
-
           <div className="bg-white p-5 rounded-full shadow-lg">
-
             <FaUser className="text-5xl text-blue-700" />
-
           </div>
-
         </div>
 
         {/* Heading */}
-
-        <h1 className="text-4xl font-bold text-center text-Black mb-3">
-
+        <h1 className="text-4xl font-bold text-center text-black mb-3">
           User Login
-
         </h1>
 
         <p className="text-center text-slate-500 mb-8">
-
           Login to borrow and manage books
-
         </p>
 
         {/* Form */}
-
-        <form
-          onSubmit={handleSubmit}
-          className="flex flex-col gap-5"
-        >
+        <form onSubmit={handleSubmit} className="flex flex-col gap-5">
 
           {/* Email */}
-
           <input
             type="email"
             name="email"
             placeholder="Enter your email"
             className="p-3 rounded-xl border border-gray-300 outline-none focus:ring-2 focus:ring-blue-400"
             onChange={handleChange}
+            required
           />
 
           {/* Password */}
-
           <div className="relative">
-
             <input
-              type={
-                showPassword
-                  ? "text"
-                  : "password"
-              }
+              type={showPassword ? "text" : "password"}
               name="password"
               placeholder="Enter password"
               className="w-full p-3 rounded-xl border border-gray-300 outline-none focus:ring-2 focus:ring-blue-400"
               onChange={handleChange}
+              required
             />
 
             <button
               type="button"
               className="absolute right-4 top-4 text-gray-600"
-              onClick={() =>
-                setShowPassword(!showPassword)
-              }
+              onClick={() => setShowPassword(!showPassword)}
             >
-
-              {
-                showPassword
-                  ? <FaEyeSlash />
-                  : <FaEye />
-              }
-
+              {showPassword ? <FaEyeSlash /> : <FaEye />}
             </button>
-
           </div>
 
           {/* Login Button */}
-
           <button className="bg-blue-600 hover:bg-blue-500 text-white py-3 rounded-xl text-lg font-semibold transition duration-300 shadow-lg">
-
             Login
-
           </button>
 
         </form>
 
         {/* Signup Link */}
-
-        <p className="text-center text-gray mt-6">
-
+        <p className="text-center text-gray-600 mt-6">
           New User?{" "}
-
           <Link
             to="/register"
             className="text-green-800 hover:text-blue-800 font-semibold"
           >
-
             Signup Here
-
           </Link>
-
         </p>
 
       </div>
-
     </div>
   );
 }

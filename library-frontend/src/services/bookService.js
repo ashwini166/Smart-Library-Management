@@ -2,31 +2,17 @@ import axios from "axios";
 
 const API = "http://localhost:8080/api/books";
 
-// GET JWT TOKEN
-
 const getToken = () => {
-
   return localStorage.getItem("token");
-
 };
 
-// PUBLIC
-
+// ================= GET BOOKS =================
 export const getBooks = () => {
-
   return axios.get(API);
-
-  
 };
-export const borrowBook = (id, userId) =>
-  axios.put(`${API}/borrow/${id}`, { userId });
 
-export const returnBook = (id) =>
-  axios.put(`${API}/return/${id}`);
-// ADD BOOK
-
+// ================= ADD BOOK =================
 export const addBook = (data) => {
-
   return axios.post(
     API,
     data,
@@ -36,13 +22,10 @@ export const addBook = (data) => {
       }
     }
   );
-
 };
 
-// UPDATE BOOK
-
+// ================= UPDATE BOOK =================
 export const updateBook = (id, data) => {
-
   return axios.put(
     `${API}/${id}`,
     data,
@@ -52,20 +35,76 @@ export const updateBook = (id, data) => {
       }
     }
   );
+};
+
+// ================= DELETE BOOK =================
+export const deleteBook = (id) => {
+  return axios.delete(
+    `${API}/${id}`,
+    {
+      headers: {
+        Authorization: `Bearer ${getToken()}`
+      }
+    }
+  );
+};
+
+// ================= BORROW BOOK =================
+export const borrowBook =
+(id)=>{
+
+return axios.put(
+
+`${API}/borrow/${id}`,
+
+{},
+
+{
+headers:{
+Authorization:
+`Bearer ${getToken()}`
+}
+}
+
+);
 
 };
 
-// DELETE BOOK
+// ================= RETURN BOOK =================
+export const returnBook =
+(id)=>{
 
-export const deleteBook = (id) => {
-  if (!id) {
-    console.error("deleteBook called without id");
-    return;
-  }
+return axios.put(
 
-  return axios.delete(`${API}/${id}`, {
+`${API}/return/${id}`,
+
+{},
+
+{
+headers:{
+Authorization:
+`Bearer ${getToken()}`
+}
+}
+
+);
+
+};
+
+// ================= ADMIN DASHBOARD =================
+export const getDashboard = () => {
+  return axios.get(
+    `${API}/dashboard`,
+    {
+      headers: {
+        Authorization: `Bearer ${getToken()}`
+      }
+    }
+  );
+};
+export const getAnalytics = () =>
+  axios.get("http://localhost:8080/api/books/analytics", {
     headers: {
-      Authorization: `Bearer ${getToken()}`
+      Authorization: `Bearer ${localStorage.getItem("token")}`
     }
   });
-};

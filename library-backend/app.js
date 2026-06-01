@@ -1,17 +1,20 @@
 const express = require("express");
+const cors = require("cors");
 
 const app = express();
 
-const authRoutes = require("./routes/authRoutes");
+app.use(cors({
+  origin: "http://localhost:5173"
+}));
 
-const bookRoutes = require("./routes/bookRoutes");
-const cors = require("cors");
-
-app.use(cors());
 app.use(express.json());
 
-app.use("/api/auth", authRoutes);
+const authRoutes = require("./routes/authRoutes");
+const bookRoutes = require("./routes/bookRoutes");
+const dashboardRoutes = require("./routes/dashboardRoutes");
 
+app.use("/api/dashboard", dashboardRoutes);
+app.use("/api/auth", authRoutes);
 app.use("/api/books", bookRoutes);
 
 app.get("/", (req, res) => {

@@ -1,29 +1,44 @@
 const Book = require("../models/Book");
-const BorrowHistory = require("../models/BorrowHistory"); // ✅ ADD THIS HERE
-
+const BorrowHistory = require("../models/BorrowHistory");
 // ================= ADD BOOK =================
 
 exports.addBook = async (req, res) => {
-
   try {
+    const { title, author, totalCopies } = req.body;
 
-    let { title, author } = req.body;
-
-    title = title?.trim();
-    author = author?.trim();
-
-    if (!title || !author) {
-
+    // 🔴 VALIDATION START
+    if (!title || !title.trim()) {
       return res.status(400).json({
         success: false,
-        message: "Title and author are required"
+        message: "Title is required"
       });
-
     }
 
+    if (!author || !author.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: "Author is required"
+      });
+    }
+
+    if (
+      totalCopies === undefined ||
+      totalCopies === null ||
+      isNaN(totalCopies) ||
+      Number(totalCopies) <= 0
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Total copies must be a valid number greater than 0"
+      });
+    }
+    // 🔴 VALIDATION END
+
     const book = await Book.create({
-      title,
-      author
+      title: title.trim(),
+      author: author.trim(),
+      totalCopies: Number(totalCopies),
+      borrowedBy: []
     });
 
     res.status(201).json({
@@ -33,110 +48,90 @@ exports.addBook = async (req, res) => {
     });
 
   } catch (error) {
-
     console.log("ADD BOOK ERROR:", error);
 
     res.status(500).json({
       success: false,
       message: error.message
     });
-
   }
-
 };
 
-
 // ================= GET ALL BOOKS =================
-
 exports.getBooks = async (req, res) => {
-
   try {
+    const books = await Book.find().populate(
+      "borrowedBy",
+      "fullName email"
+    );
 
-    const books = await Book.find()
-      .populate(
-        "borrowedBy",
-        "fullName email"
-      );
+    const updatedBooks = books.map((book) => {
+      const availableCopies =
+        book.totalCopies - book.borrowedBy.length;
+
+      return {
+        _id: book._id,
+        title: book.title,
+        author: book.author,
+        totalCopies: book.totalCopies,
+        borrowedBy: book.borrowedBy,
+        availableCopies
+      };
+    });
 
     res.status(200).json({
       success: true,
-      count: books.length,
-      books
+      books: updatedBooks
     });
 
   } catch (error) {
-
-    console.log("GET BOOKS ERROR:", error);
-
     res.status(500).json({
       success: false,
       message: error.message
     });
-
   }
-
 };
 
-
 // ================= UPDATE BOOK =================
-
 exports.updateBook = async (req, res) => {
-
   try {
+    const { title, author, totalCopies } = req.body;
 
-    const { id } = req.params;
-
-    const book = await Book.findById(id);
+    const book = await Book.findById(req.params.id);
 
     if (!book) {
-
-      return res.status(404).json({
-        success: false,
-        message: "Book not found"
-      });
-
+      return res.status(404).json({ message: "Book not found" });
     }
 
-    let {
-      title,
-      author,
-      available
-    } = req.body;
+    if (title) book.title = title;
+    if (author) book.author = author;
 
-    if (title !== undefined) {
-      book.title = title.trim();
-    }
+    if (totalCopies !== undefined) {
+      const borrowedCount = book.borrowedBy.length;
 
-    if (author !== undefined) {
-      book.author = author.trim();
-    }
+      if (Number(totalCopies) < borrowedCount) {
+        return res.status(400).json({
+          message: "Total copies cannot be less than borrowed copies"
+        });
+      }
 
-    if (available !== undefined) {
-      book.available = available;
+      book.totalCopies = Number(totalCopies);
     }
 
     await book.save();
 
     res.json({
       success: true,
-      message: "Book updated successfully",
+      message: "Book updated",
       book
     });
 
   } catch (error) {
-
-    console.log("UPDATE BOOK ERROR:", error);
-
     res.status(500).json({
-      success: false,
       message: error.message
     });
-
   }
-
 };
-
-
 // ================= DELETE BOOK =================
 
 exports.deleteBook = async (req, res) => {
@@ -177,7 +172,6 @@ exports.deleteBook = async (req, res) => {
 
 
 // ================= BORROW BOOK =================
-
 exports.borrowBook = async (req, res) => {
   try {
     const book = await Book.findById(req.params.id);
@@ -186,35 +180,36 @@ exports.borrowBook = async (req, res) => {
       return res.status(404).json({ message: "Book not found" });
     }
 
-    if (!book.available) {
+    const availableCopies = book.totalCopies - book.borrowedBy.length;
+
+    if (availableCopies <= 0) {
+      return res.status(400).json({ message: "No copies available" });
+    }
+
+    if (book.borrowedBy.includes(req.user._id)) {
       return res.status(400).json({ message: "Already borrowed" });
     }
 
-    book.available = false;
-    book.borrowedBy = req.user._id;
-    book.borrowedAt = new Date();
-
+    book.borrowedBy.push(req.user._id);
     await book.save();
 
-    // 🔥 SAVE HISTORY
+    // 🔥 STORE HISTORY (IMPORTANT FIX)
     await BorrowHistory.create({
       user: req.user._id,
       book: book._id,
-      action: "BORROWED",
-      time: new Date()
+      action: "BORROW"
     });
 
     res.json({
       success: true,
-      message: "Book borrowed successfully",
-      book
+      message: "Book borrowed"
     });
 
-  } catch (err) {
-    res.status(500).json({ message: err.message });
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ message: "Server Error" });
   }
 };
-
 
 // ================= RETURN BOOK =================
 exports.returnBook = async (req, res) => {
@@ -225,31 +220,97 @@ exports.returnBook = async (req, res) => {
       return res.status(404).json({ message: "Book not found" });
     }
 
-    if (book.borrowedBy?.toString() !== req.user._id.toString()) {
-      return res.status(403).json({ message: "Not allowed" });
-    }
-
-    book.available = true;
-    book.borrowedBy = null;
-    book.borrowedAt = null;
+    book.borrowedBy = book.borrowedBy.filter(
+      id => id.toString() !== req.user._id.toString()
+    );
 
     await book.save();
 
-    // 🔥 SAVE HISTORY
+    // 🔥 STORE HISTORY (IMPORTANT FIX)
     await BorrowHistory.create({
       user: req.user._id,
       book: book._id,
-      action: "RETURNED",
-      time: new Date()
+      action: "RETURN"
     });
 
     res.json({
       success: true,
-      message: "Book returned successfully",
-      book
+      message: "Book returned"
+    });
+
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ message: "Server Error" });
+  }
+};
+// ================= ADMIN DASHBOARD =================
+exports.adminDashboard = async (req, res) => {
+  try {
+    const books = await Book.find().populate(
+      "borrowedBy",
+      "fullName email"
+    );
+
+    const dashboard = books.map((book) => {
+      const availableCopies =
+        book.totalCopies - book.borrowedBy.length;
+
+      return {
+        title: book.title,
+        totalCopies: book.totalCopies,
+        availableCopies,
+        borrowCount: book.borrowedBy.length,
+        borrowers: [...new Set(
+          book.borrowedBy.map((u) => u.fullName)
+        )]
+      };
+    });
+
+    res.json({
+      success: true,
+      dashboard
+    });
+
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+exports.getAnalytics = async (req, res) => {
+  try {
+    const BorrowHistory = require("../models/BorrowHistory");
+
+    const history = await BorrowHistory.find()
+      .populate("book", "title")
+      .populate("user", "fullName email");
+
+    const analyticsMap = {};
+
+    history.forEach((entry) => {
+      const id = entry.book._id.toString();
+
+      if (!analyticsMap[id]) {
+        analyticsMap[id] = {
+          title: entry.book.title,
+          borrowCount: 0,
+          borrowers: []
+        };
+      }
+
+      analyticsMap[id].borrowCount += 1;
+      analyticsMap[id].borrowers.push(entry.user.fullName);
+    });
+
+    res.json({
+      success: true,
+      analytics: Object.values(analyticsMap)
     });
 
   } catch (err) {
+    console.log(err);
     res.status(500).json({ message: err.message });
   }
 };
